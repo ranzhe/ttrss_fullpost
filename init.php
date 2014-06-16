@@ -21,7 +21,7 @@ class Af_Fullpost extends Plugin implements IHandler
 	private $host;
 
 	function about() {
-		return array(0.03,
+		return array(0.04,
 			"Full post (requires CURL).",
 			"atallo");
 	}
@@ -50,7 +50,6 @@ class Af_Fullpost extends Plugin implements IHandler
 			return $article;
 		}
 		
-		//foreach ($data as $urlpart=>$config) {
 		foreach ($data as $urlpart) {
 			// 2/23/14: stripos() is a case-insensitive version of strpos()
 			if (stripos($article['link'], $urlpart) === false) continue; // skip this entry, if the URL doesn't match
@@ -60,10 +59,13 @@ class Af_Fullpost extends Plugin implements IHandler
 				break;
 			}
 			
-			$article['content'] = $this->get_full_post($article['link']);
-			//$article["content"] .= "<br/><hr/>Web original:<br><hr/>" .
-			//	$this->get_full_post($article["link"]);
-			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
+			// 6/16/14: try/catch the Readbility call, in case it fails
+			try {
+				$article['content'] = $this->get_full_post($article['link']);
+				$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
+			} catch (Exception $e) {
+				// Readability failed to parse the page (?); don't process this article and keep going
+			}
 			break;
 		}
 		
@@ -74,19 +76,6 @@ class Af_Fullpost extends Plugin implements IHandler
 		// https://github.com/feelinglucky/php-readability
 		
 		include_once 'Readability.inc.php';
-		
-		//define("DIR_ROOT", dirname(__FILE__));
-		//define("DIR_CACHE",  DIR_ROOT . '/cache');
-		
-		//$request_url = "http://www.siliconnews.es/2013/07/01/estos-son-los-sueldos-de-los-principales-directivos-de-la-industria-tecnologica/";
-		
-		//$request_url_hash = md5($request_url);
-		//$request_url_cache_file = sprintf(DIR_CACHE."/%s.url", $request_url_hash);
-		
-		//if (file_exists($request_url_cache_file) &&
-		//	(time() - filemtime($request_url_cache_file) < CACHE_TIME)) {
-		//		$source = file_get_contents($request_url_cache_file);
-		//	} else {
 		
 		$handle = curl_init();
 		curl_setopt_array($handle, array(
@@ -102,10 +91,6 @@ class Af_Fullpost extends Plugin implements IHandler
 		$source = curl_exec($handle);
 		curl_close($handle);
 		
-		//		// Write request data into cache file.
-		//		file_put_contents($request_url_cache_file, $source);
-		//	}
-		
 		//if (!$charset = mb_detect_encoding($source)) {
 		//}
 		preg_match("/charset=([\w|\-]+);?/", $source, $match);
@@ -117,9 +102,6 @@ class Af_Fullpost extends Plugin implements IHandler
 		//$title   = $Data['title'];
 		//$content = $Data['content'];
 		
-		//#include 'template/reader.html';
-		//echo $title;
-		
 		return $Data['content'];
 	}
 	
@@ -129,7 +111,7 @@ class Af_Fullpost extends Plugin implements IHandler
 		print '<div id="fullpostConfigTab" dojoType="dijit.layout.ContentPane"
 					href="backend.php?op=af_fullpost"
 					title="' . __('FullPost') . '"></div>';
-  }
+	}
 	
 	function index()
 	{
