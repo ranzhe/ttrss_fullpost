@@ -35,29 +35,22 @@ class Af_Fullpost extends Plugin implements IHandler
 		if (!function_exists("curl_init"))
 			return $article;
 		
-		$json_conf = $this->host->get($this, 'json_conf');
 		$owner_uid = $article['owner_uid'];
-		$data = json_decode($json_conf, true);
 		
-		if (!is_array($data)) {
-			// no valid JSON or no configuration at all
-			return $article;
+		// 2/23/14: stripos() is a case-insensitive version of strpos()
+		if (strpos($article['plugin_data'], "fullpost,$owner_uid:") !== false) {
+			// do not process an article more than once
+			if (isset($article['stored']['content'])) $article['content'] = $article['stored']['content'];
+			break;
 		}
 		
-			// 2/23/14: stripos() is a case-insensitive version of strpos()
-			if (strpos($article['plugin_data'], "fullpost,$owner_uid:") !== false) {
-				// do not process an article more than once
-				if (isset($article['stored']['content'])) $article['content'] = $article['stored']['content'];
-				break;
-			}
-			
-			// 6/16/14: try/catch the Readbility call, in case it fails
-			try {
-				$article['content'] = $this->get_full_post($article['link']);
-				$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
-			} catch (Exception $e) {
-				// Readability failed to parse the page (?); don't process this article and keep going
-			}
+		// 6/16/14: try/catch the Readbility call, in case it fails
+		try {
+			$article['content'] = $this->get_full_post($article['link']);
+			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
+		} catch (Exception $e) {
+			// Readability failed to parse the page (?); don't process this article and keep going
+		}
 		
 		return $article;
 	}
@@ -106,48 +99,6 @@ class Af_Fullpost extends Plugin implements IHandler
 	function index()
 	{
 		$pluginhost = PluginHost::getInstance();
-		$json_conf = $pluginhost->get($this, 'json_conf');
-		
-		print "<form dojoType=\"dijit.form.Form\">";
-		
-		print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt\">
-			evt.preventDefault();
-			if (this.validate()) {
-				new Ajax.Request('backend.php', {
-					parameters: dojo.objectToQuery(this.getValues()),
-					onComplete: function(transport) {
-						if (transport.responseText.indexOf('error')>=0) notify_error(transport.responseText);
-						else notify_info(transport.responseText);
-					}
-				});
-				//this.reset();
-			}
-			</script>";
-		
-		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pluginhandler\">";
-		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"save\">";
-		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"plugin\" value=\"af_fullpost\">";
-		
-		print "<table width='100%'><tr><td>";
-		print "<textarea dojoType=\"dijit.form.SimpleTextarea\" name=\"json_conf\" style=\"font-size: 12px; width: 99%; height: 500px;\">$json_conf</textarea>";
-		print "</td></tr></table>";
-		
-		print "<p><button dojoType=\"dijit.form.Button\" type=\"submit\">".__("Save")."</button>";
-		
-		print "</form>";
-	}
-	
-	function save()
-	{
-		$json_conf = $_POST['json_conf'];
-		
-		if (is_null(json_decode($json_conf))) {
-			echo __("error: Invalid JSON!");
-			return false;
-		}
-		
-		$this->host->set($this, 'json_conf', $json_conf);
-		echo __("Configuration saved.");
 	}
 	
 	function csrf_ignore($method)
