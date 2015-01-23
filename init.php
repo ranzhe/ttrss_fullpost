@@ -4,12 +4,7 @@
 // Now with preference panel, ripped out of: https://github.com/mbirth/ttrss_plugin-af_feedmod
 // Relies on PHP-Readability: https://github.com/feelinglucky/php-readability
 
-// Expects the preference field to be valid JSON, which for arrays means we need square braces:
-// [
-//	 "kotaku.com",
-//	 "destructoid",
-//	 "arstechnica.com"
-// ]
+// This Version is changed by ManuelW to get ALL! feeds with fulltext
 
 // Note that this will consider the feed to match if the feed's "link" URL contains any
 // element's text. Most notably, Destructoid's posts are linked through Feedburner, and
@@ -21,9 +16,9 @@ class Af_Fullpost extends Plugin implements IHandler
 	private $host;
 
 	function about() {
-		return array(0.04,
-			"Full post (requires CURL).",
-			"atallo");
+		return array(0.01,
+			"Full post for ALL articles (requires CURL).",
+			"ManuelW");
 	}
 	
 	function api_version() {
@@ -33,7 +28,6 @@ class Af_Fullpost extends Plugin implements IHandler
 	function init($host) {
 		$this->host = $host;
 
-		$host->add_hook($host::HOOK_PREFS_TABS, $this);
 		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
 	}
 	
@@ -50,9 +44,7 @@ class Af_Fullpost extends Plugin implements IHandler
 			return $article;
 		}
 		
-		foreach ($data as $urlpart) {
 			// 2/23/14: stripos() is a case-insensitive version of strpos()
-			if (stripos($article['link'], $urlpart) === false) continue; // skip this entry, if the URL doesn't match
 			if (strpos($article['plugin_data'], "fullpost,$owner_uid:") !== false) {
 				// do not process an article more than once
 				if (isset($article['stored']['content'])) $article['content'] = $article['stored']['content'];
@@ -66,8 +58,6 @@ class Af_Fullpost extends Plugin implements IHandler
 			} catch (Exception $e) {
 				// Readability failed to parse the page (?); don't process this article and keep going
 			}
-			break;
-		}
 		
 		return $article;
 	}
@@ -165,7 +155,7 @@ class Af_Fullpost extends Plugin implements IHandler
 		$csrf_ignored = array("index", "edit");
 		return array_search($method, $csrf_ignored) !== false;
 	}
-	
+
 	function before($method)
 	{
 		if ($_SESSION["uid"]) {
