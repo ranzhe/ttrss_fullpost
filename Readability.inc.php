@@ -41,28 +41,28 @@ class Readability {
     // 章节的父元素列表
     private $parentNodes = array();
 
-    // 需要删除的标签
+    // Need to remove labels
     // Note: added extra tags from https://github.com/ridcully
     private $junkTags = Array("style", "form", "iframe", "script", "button", "input", "textarea", 
                                 "noscript", "select", "option", "object", "applet", "basefont",
                                 "bgsound", "blink", "canvas", "command", "menu", "nav", "datalist",
                                 "embed", "frame", "frameset", "keygen", "label", "marquee", "link");
 
-    // 需要删除的属性
+    // Need to remove the property
     private $junkAttrs = Array("style", "class", "onclick", "onmouseover", "align", "border", "margin");
 
 
     /**
-     * 构造函数
+     * Constructor
      *      @param $input_char 字符串的编码。默认 utf-8，可以省略
      */
     function __construct($source, $input_char = "utf-8") {
         $this->source = $source;
 
-        // DOM 解析类只能处理 UTF-8 格式的字符
+        // DOM parsing class can handle UTF-8 character format
         $source = mb_convert_encoding($source, 'HTML-ENTITIES', $input_char);
 
-        // 预处理 HTML 标签，剔除冗余的标签等
+        // Pretreatment HTML tags, remove redundant labels
         $source = $this->preparSource($source);
 
         // 生成 DOM 解析类
@@ -89,12 +89,12 @@ class Readability {
 
 
     /**
-     * 预处理 HTML 标签，使其能够准确被 DOM 解析类处理
+     * Pretreatment HTML tags, so that it can be processed accurately DOM parsing classes
      *
      * @return String
      */
     private function preparSource($string) {
-        // 剔除多余的 HTML 编码标记，避免解析出错
+        // Excluding the extra HTML coding markup, avoid parsing errors
         preg_match("/charset=([\w|\-]+);?/", $string, $match);
         if (isset($match[1])) {
             $string = preg_replace("/charset=([\w|\-]+);?/", "", $string, 1);
@@ -113,7 +113,7 @@ class Readability {
 
 
     /**
-     * 删除 DOM 元素中所有的 $TagName 标签
+     * Delete all of the DOM element $TagName tag
      *
      * @return DOMDocument
      */
@@ -152,8 +152,27 @@ class Readability {
      * @return DOMNode
      */
     private function getTopBox() {
-        // 获得页面所有的章节
-        $allParagraphs = $this->DOM->getElementsByTagName("p");
+
+		// Count div tags
+        $checkParagraphs = $this->DOM->getElementsByTagName("div");
+        while($paragraph = $checkParagraphs->item($i++)) {
+        	$checkDIV += 1;
+        }
+		
+		// Count p tags
+        $checkParagraphs = $this->DOM->getElementsByTagName("p");
+        while($paragraph = $checkParagraphs->item($i++)) {
+        	$checkP += 1;
+        }
+
+        // Get all the chapters page, from the biggest count of tags div or p
+        // workaround for pages that handle with div instead p tags
+		if ($checkDIV > $checkP) {
+	        $allParagraphs = $this->DOM->getElementsByTagName("div");
+	    } 
+	    else {
+	        $allParagraphs = $this->DOM->getElementsByTagName("p");
+	    }
 
         // Study all the paragraphs and find the chunk that has the best score.
         // A score is determined by things like: Number of <p>'s, commas, special classes, etc.
@@ -188,10 +207,10 @@ class Readability {
                 $contentScore += strlen($paragraph->nodeValue);
             }
 
-            // 保存父元素的判定得分
+            // Preservation of the parent element determination score
             $parentNode->setAttribute(Readability::ATTR_CONTENT_SCORE, $contentScore);
 
-            // 保存章节的父元素，以便下次快速获取
+            // Save sections of the parent element, so that the next quick access
             array_push($this->parentNodes, $parentNode);
         }
 
@@ -209,7 +228,7 @@ class Readability {
             }
         }
         
-        // 此时，$topBox 应为已经判定后的页面内容主元素
+        // At this time, $topBox should have been the main content of the page after the determination of elements
         return $topBox;
     }
 
