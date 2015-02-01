@@ -33,6 +33,8 @@ class Af_Fullpost extends Plugin implements IHandler
 	}
 	
 	function hook_article_filter($article) {
+		global $show_info;
+	
 		if (!function_exists("curl_init"))
 			return $article;
 
