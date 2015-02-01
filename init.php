@@ -1,16 +1,16 @@
 <?php
-
 // Initial version of this plugin: https://github.com/atallo/ttrss_fullpost/
-// Now with preference panel, ripped out of: https://github.com/mbirth/ttrss_plugin-af_feedmod
-// Relies on PHP-Readability: https://github.com/feelinglucky/php-readability
+// Relies on PHP-Readability by fivefilters.org: http://code.fivefilters.org/php-readability/
 
-// This Version is changed by ManuelW to get ALL! feeds with fulltext
+// This Version is changed by ManuelW to get ALL! feeds with fulltext, except this in comma separated list
 
-// Note that this will consider the feed to match if the feed's "link" URL contains any
-// element's text. Most notably, Destructoid's posts are linked through Feedburner, and
-// so "destructoid.com" doesn't match--but there is a "Destructoid" in the Feedburner URL,
-// so "destructoid" will. (Link comparisons are case-insensitive.)
+////// Setting /////////
+// Setting to show infos about the processing by readability on bottom of the articles
+// Set to 0 if you dont wan't to see them
+$show_info = 1;
+////////////////////////
 
+// Start Code
 class Af_Fullpost extends Plugin implements IHandler
 {
 	private $host;
@@ -28,62 +28,126 @@ class Af_Fullpost extends Plugin implements IHandler
 	function init($host) {
 		$this->host = $host;
 
+		$host->add_hook($host::HOOK_PREFS_TABS, $this);
 		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
 	}
 	
 	function hook_article_filter($article) {
 		if (!function_exists("curl_init"))
 			return $article;
-		
+
+		$json_conf = $this->host->get($this, 'json_conf');
 		$owner_uid = $article['owner_uid'];
+		// remove some linebreaks and split by comma
+		$data = str_replace("\n", "", explode(",", $json_conf));
 		
-		// 2/23/14: stripos() is a case-insensitive version of strpos()
+		if (!is_array($data)) {
+			// no valid JSON or no configuration at all
+			return $article;
+		}
+		
+		// do not process an article more than once
 		if (strpos($article['plugin_data'], "fullpost,$owner_uid:") !== false) {
-			// do not process an article more than once
 			if (isset($article['stored']['content'])) $article['content'] = $article['stored']['content'];
 			break;
 		}
 		
-		// 6/16/14: try/catch the Readbility call, in case it fails
 		try {
-			$article['content'] = $this->get_full_post($article['link']);
+			// check url for skipping
+			foreach ($data as $urlpart) {
+				if (stripos($article['link'], trim($urlpart))) {
+					$check_content = "Skipped";
+				}
+				else {
+					$check_content = $this->get_full_post($article['link']);
+				}
+			}
+			
+			// Print some information if content was processed by readability if enabled
+			if ($show_info == 1) {
+				if ($check_content != "Failed" && $check_content != "Skipped" && $check_content != "") {
+					$article['content'] = $check_content . "<br>Processed by Readability";
+				}
+				elseif ($check_content == "Skipped") {
+					$article['content'] = $article['content'] . "<br>Skipped Readability";
+				}
+				else {
+					$article['content'] = $article['content'] . "<br>Failed Processed by Readability";
+				}
+			}
+			
+			// mark article as processed
 			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
+			
 		} catch (Exception $e) {
 			// Readability failed to parse the page (?); don't process this article and keep going
+			// mark article as processed
+			$article['content'] = $article['content'] . "<br>ERROR Processing by Readability<br>" . $e;
+			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
+		}
+
+		# clean links without http, some sites do <img src="//www.site.com"> for safe to get images with http and https
+		$toClean = array("\"//");
+		$article["content"] = str_replace($toClean, "\"http://", $article["content"], $count);
+		if ($show_info == 1) {
+			$article['content'] = $article['content'] . " + " . $count . " Replacements";
 		}
 		
 		return $article;
 	}
 	
 	private function get_full_post($request_url) {
-		// https://github.com/feelinglucky/php-readability
-		
-		include_once 'Readability.inc.php';
-		
-		$handle = curl_init();
-		curl_setopt_array($handle, array(
-			CURLOPT_USERAGENT => USER_AGENT,
-			CURLOPT_FOLLOWLOCATION => true,
-			CURLOPT_HEADER  => false,
-			CURLOPT_HTTPGET => true,
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_TIMEOUT => 30,
-			CURLOPT_URL => $request_url
-		));
-		
-		$source = curl_exec($handle);
-		curl_close($handle);
-		
-		//if (!$charset = mb_detect_encoding($source)) {
-		//}
-		preg_match("/charset=([\w|\-]+);?/", $source, $match);
-		$charset = isset($match[1]) ? $match[1] : 'utf-8';
-		
-		$Readability = new Readability($source, $charset);
-		$Data = $Readability->getContent();
-		
-		//$title   = $Data['title'];
-		//$content = $Data['content'];
+		try {
+			try {
+				$handle = curl_init();
+				curl_setopt_array($handle, array(
+					CURLOPT_USERAGENT => "Tiny Tiny RSS",
+					CURLOPT_FOLLOWLOCATION => true,
+					CURLOPT_HEADER  => false,
+					CURLOPT_HTTPGET => true,
+					CURLOPT_RETURNTRANSFER => true,
+					CURLOPT_TIMEOUT => 30,
+					CURLOPT_URL => $request_url
+				));
+	
+				$source = curl_exec($handle);
+				curl_close($handle);
+				
+				if (function_exists('tidy_parse_string')) {
+					$tidy = tidy_parse_string($source, array(), 'UTF8');
+					$tidy->cleanRepair();
+					$source = $tidy->value;
+				}
+			}
+			catch (Exception $e) {
+				$source = file_get_contents($request_url);
+				
+				if (function_exists('tidy_parse_string')) {
+					$tidy = tidy_parse_string($source, array(), 'UTF8');
+					$tidy->cleanRepair();
+					$source = $tidy->value;
+				}
+			}
+
+			// get the Text
+			require_once 'Readability.php';
+			$readability = new Readability($source);
+			$readability->debug = false;
+			$readability->convertLinksToFootnotes = false;
+			$result = $readability->init();
+			$content = $readability->getContent()->innerHTML;
+			// if we've got Tidy, let's clean it up for output
+			if (function_exists('tidy_parse_string')) {
+				$tidy = tidy_parse_string($content, array('indent'=>true, 'show-body-only' => true), 'UTF8');
+				$tidy->cleanRepair();
+				$content = $tidy->value;
+			}
+
+			$Data['content'] = $content;	
+		}
+		catch (Exception $e) {
+			// do nothing if it dont grep fulltext succesfully
+		}
 		
 		return $Data['content'];
 	}
@@ -93,14 +157,51 @@ class Af_Fullpost extends Plugin implements IHandler
 	{
 		print '<div id="fullpostConfigTab" dojoType="dijit.layout.ContentPane"
 					href="backend.php?op=af_fullpost"
-					title="' . __('FullPost') . '"></div>';
+					title="' . __('Exclude FullPost') . '"></div>';
 	}
 	
 	function index()
 	{
 		$pluginhost = PluginHost::getInstance();
+		$json_conf = $pluginhost->get($this, 'json_conf');
+		
+		print "<p>Comma-separated list of web addresses, for which you don't would fetch the full post.<br>Example: site1.com, site2.org, site3.de</p>";
+		print "<form dojoType=\"dijit.form.Form\">";
+		
+		print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt\">
+			evt.preventDefault();
+			if (this.validate()) {
+				new Ajax.Request('backend.php', {
+					parameters: dojo.objectToQuery(this.getValues()),
+					onComplete: function(transport) {
+						if (transport.responseText.indexOf('error')>=0) notify_error(transport.responseText);
+						else notify_info(transport.responseText);
+					}
+				});
+				//this.reset();
+			}
+			</script>";
+		
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pluginhandler\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"save\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"plugin\" value=\"af_fullpost\">";
+		
+		print "<table width='100%'><tr><td>";
+		print "<textarea dojoType=\"dijit.form.SimpleTextarea\" name=\"json_conf\" style=\"font-size: 12px; width: 99%; height: 500px;\">$json_conf</textarea>";
+		print "</td></tr></table>";
+		
+		print "<p><button dojoType=\"dijit.form.Button\" type=\"submit\">".__("Save")."</button>";
+		
+		print "</form>";
 	}
-	
+
+	function save()
+	{
+		$json_conf = $_POST['json_conf'];
+		$this->host->set($this, 'json_conf', $json_conf);
+		echo __("Configuration saved.");
+	}
+
 	function csrf_ignore($method)
 	{
 		$csrf_ignored = array("index", "edit");
