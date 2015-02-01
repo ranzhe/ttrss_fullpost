@@ -7,6 +7,8 @@ Relies on PHP-Readability to suss out the full article text.
 This Plugin process ALL articles, except this in the preferences excluded.
 You can specify which feeds should NOT be processed.
 
+Second thing, it repairs some img links. Some sites do: img src="//www.site.com" for safe to get images with http and https.
+So some images wont shown in mobile apps. This plugin repairs the links by replace // with http://
 
 Installation
 ------------------------

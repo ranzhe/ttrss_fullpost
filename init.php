@@ -4,12 +4,6 @@
 
 // This Version is changed by ManuelW to get ALL! feeds with fulltext, except this in comma separated list
 
-////// Setting /////////
-// Setting to show infos about the processing by readability on bottom of the articles
-// Set to 0 if you dont wan't to see them
-$show_info = 1;
-////////////////////////
-
 // Start Code
 class Af_Fullpost extends Plugin implements IHandler
 {
@@ -33,12 +27,13 @@ class Af_Fullpost extends Plugin implements IHandler
 	}
 	
 	function hook_article_filter($article) {
-		global $show_info;
-	
 		if (!function_exists("curl_init"))
 			return $article;
 
 		$json_conf = $this->host->get($this, 'json_conf');
+//		$showInfoEnabled = $pluginhost->get($this, 'af_fullpost_showinfo');
+		$showInfoEnabled = sql_bool_to_bool($this->host->get($this, "af_fullpost_showinfo", bool_to_sql_bool(TRUE)));
+		
 		$owner_uid = $article['owner_uid'];
 		// remove some linebreaks and split by comma
 		$data = str_replace("\n", "", explode(",", $json_conf));
@@ -55,7 +50,7 @@ class Af_Fullpost extends Plugin implements IHandler
 		}
 		
 		try {
-			// check url for skipping
+			// check url for excluded
 			foreach ($data as $urlpart) {
 				if (stripos($article['link'], trim($urlpart))) {
 					$check_content = "Skipped";
@@ -66,7 +61,7 @@ class Af_Fullpost extends Plugin implements IHandler
 			}
 			
 			// Print some information if content was processed by readability if enabled
-			if ($show_info == 1) {
+			if ($showInfoEnabled) {
 				if ($check_content != "Failed" && $check_content != "Skipped" && $check_content != "") {
 					$article['content'] = $check_content . "<br>Processed by Readability";
 				}
@@ -88,10 +83,10 @@ class Af_Fullpost extends Plugin implements IHandler
 			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
 		}
 
-		# clean links without http, some sites do <img src="//www.site.com"> for safe to get images with http and https
+		// clean links without http, some sites do <img src="//www.site.com"> for safe to get images with http and https
 		$toClean = array("\"//");
 		$article["content"] = str_replace($toClean, "\"http://", $article["content"], $count);
-		if ($show_info == 1) {
+		if ($showInfoEnabled) {
 			$article['content'] = $article['content'] . " + " . $count . " Replacements";
 		}
 		
@@ -167,6 +162,13 @@ class Af_Fullpost extends Plugin implements IHandler
 		$pluginhost = PluginHost::getInstance();
 		$json_conf = $pluginhost->get($this, 'json_conf');
 		
+		$showInfoEnabled = $pluginhost->get($this, 'af_fullpost_showinfo');
+		if ($showInfoEnabled) {
+			$fullPostChecked = "checked=\"1\"";
+		} else {
+			$fullPostChecked = "";
+		}
+		
 		print "<p>Comma-separated list of web addresses, for which you don't would fetch the full post.<br>Example: site1.com, site2.org, site3.de</p>";
 		print "<form dojoType=\"dijit.form.Form\">";
 		
@@ -189,6 +191,11 @@ class Af_Fullpost extends Plugin implements IHandler
 		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"plugin\" value=\"af_fullpost\">";
 		
 		print "<table width='100%'><tr><td>";
+		
+		print "Show processed by Readability info on article bottom: <input dojoType=\"dijit.form.CheckBox\" type=\"checkbox\" name=\"af_fullpost_showinfo\" id=\"af_fullpost_showinfo\" $fullPostChecked>";
+		print "</tr></td>";
+		print "<tr><td>";
+		
 		print "<textarea dojoType=\"dijit.form.SimpleTextarea\" name=\"json_conf\" style=\"font-size: 12px; width: 99%; height: 500px;\">$json_conf</textarea>";
 		print "</td></tr></table>";
 		
@@ -201,6 +208,7 @@ class Af_Fullpost extends Plugin implements IHandler
 	{
 		$json_conf = $_POST['json_conf'];
 		$this->host->set($this, 'json_conf', $json_conf);
+		$this->host->set($this, "af_fullpost_showinfo", checkbox_to_sql_bool($_POST["af_fullpost_showinfo"]));
 		echo __("Configuration saved.");
 	}
 
