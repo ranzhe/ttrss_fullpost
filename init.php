@@ -109,21 +109,21 @@ class Af_Fullpost extends Plugin implements IHandler
 	
 				$source = curl_exec($handle);
 				curl_close($handle);
-				
-				if (function_exists('tidy_parse_string')) {
-					$tidy = tidy_parse_string($source, array(), 'UTF8');
-					$tidy->cleanRepair();
-					$source = $tidy->value;
-				}
 			}
 			catch (Exception $e) {
 				$source = file_get_contents($request_url);
-				
-				if (function_exists('tidy_parse_string')) {
-					$tidy = tidy_parse_string($source, array(), 'UTF8');
-					$tidy->cleanRepair();
-					$source = $tidy->value;
-				}
+			}
+
+			// Charset check -> done by itohsnap: https://github.com/itohsnap/ttrss_fullpost/commit/815e163b724fbfb426eff43bde6c3aa744a22ae5
+			preg_match("/charset=([\w|\-]+);?/", $source, $match);
+			$charset = isset($match[1]) ? $match[1] : 'utf-8';
+			$source = mb_convert_encoding($source, 'UTF-8', $charset);
+
+			// Clean with tidy, if exists
+			if (function_exists('tidy_parse_string')) {
+				$tidy = tidy_parse_string($source, array(), 'UTF8');
+				$tidy->cleanRepair();
+				$source = $tidy->value;
 			}
 
 			// get the Text
