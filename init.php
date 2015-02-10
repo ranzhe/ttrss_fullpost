@@ -54,13 +54,11 @@ class Af_Fullpost extends Plugin implements IHandler
 						$check_content = "Skipped";
 						break;
 					}
-					else {
-						$check_content = $this->get_full_post($article['link']);
-					}
 				}
 			}
-			// if the array is empty
-			else {
+			
+			// if the array is empty or url in list
+			if ($check_contente != "Skipped") {
 				$check_content = $this->get_full_post($article['link']);
 			}
 			
