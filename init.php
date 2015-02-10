@@ -49,8 +49,8 @@ class Af_Fullpost extends Plugin implements IHandler
 			if (is_array($data)) {
 				// check url for excluded
 				foreach ($data as $urlpart) {
-					$urlpart = str_replace("\n", "", $urlpart);
-					if (stripos($article['link'], trim($urlpart))) {
+					$urlpart = trim(str_replace("\n", "", $urlpart));
+					if (stripos($article['link'], $urlpart) !== false) {
 						$check_content = "Skipped";
 					}
 					else {
