@@ -52,6 +52,7 @@ class Af_Fullpost extends Plugin implements IHandler
 					$urlpart = trim(str_replace("\n", "", $urlpart));
 					if (stripos($article['link'], $urlpart) !== false) {
 						$check_content = "Skipped";
+						break;
 					}
 					else {
 						$check_content = $this->get_full_post($article['link']);
