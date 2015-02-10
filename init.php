@@ -30,34 +30,37 @@ class Af_Fullpost extends Plugin implements IHandler
 		if (!function_exists("curl_init"))
 			return $article;
 
-		$json_conf = $this->host->get($this, 'json_conf');
-//		$showInfoEnabled = $pluginhost->get($this, 'af_fullpost_showinfo');
-		$showInfoEnabled = sql_bool_to_bool($this->host->get($this, "af_fullpost_showinfo", bool_to_sql_bool(TRUE)));
-		
-		$owner_uid = $article['owner_uid'];
-		// remove some linebreaks and split by comma
-		$data = str_replace("\n", "", explode(",", $json_conf));
-		
-		if (!is_array($data)) {
-			// no valid JSON or no configuration at all
-			return $article;
-		}
-		
 		// do not process an article more than once
 		if (strpos($article['plugin_data'], "fullpost,$owner_uid:") !== false) {
 			if (isset($article['stored']['content'])) $article['content'] = $article['stored']['content'];
 			break;
 		}
+
+		$json_conf = $this->host->get($this, 'json_conf');
+		$showInfoEnabled = sql_bool_to_bool($this->host->get($this, "af_fullpost_showinfo", bool_to_sql_bool(TRUE)));
+		
+		$owner_uid = $article['owner_uid'];
+
+		// get url's for exclusion
+		$data = explode(",", $json_conf);
 		
 		try {
-			// check url for excluded
-			foreach ($data as $urlpart) {
-				if (stripos($article['link'], trim($urlpart))) {
-					$check_content = "Skipped";
+			// if there is some stuff in the array
+			if (is_array($data)) {
+				// check url for excluded
+				foreach ($data as $urlpart) {
+					$urlpart = str_replace("\n", "", $urlpart);
+					if (stripos($article['link'], trim($urlpart))) {
+						$check_content = "Skipped";
+					}
+					else {
+						$check_content = $this->get_full_post($article['link']);
+					}
 				}
-				else {
-					$check_content = $this->get_full_post($article['link']);
-				}
+			}
+			// if the array is empty
+			else {
+				$check_content = $this->get_full_post($article['link']);
 			}
 			
 			// Print some information if content was processed by readability if enabled
@@ -114,7 +117,7 @@ class Af_Fullpost extends Plugin implements IHandler
 				$source = file_get_contents($request_url);
 			}
 
-			// Charset check -> done by itohsnap: https://github.com/itohsnap/ttrss_fullpost/commit/815e163b724fbfb426eff43bde6c3aa744a22ae5
+			// fix encoding -> done by itohsnap: https://github.com/itohsnap/ttrss_fullpost/commit/815e163b724fbfb426eff43bde6c3aa744a22ae5
 			preg_match("/charset=([\w|\-]+);?/", $source, $match);
 			$charset = isset($match[1]) ? $match[1] : 'utf-8';
 			$source = mb_convert_encoding($source, 'UTF-8', $charset);
