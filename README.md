@@ -21,8 +21,14 @@ Configuration
 ------------------------
 In the TT-RSS preferences, you should now find a new tab called "Exclude FullPost." 
 In that tab is a giant text field, where you can specify the feeds you want to EXCLUDE through PHP-Readability comma-separated:
-
 site1.com, site2.org, site3.de
+
+or by new line separated:
+site1.com
+site2.org
+site3.de
+
+or booth mixed is posibile too.
 
 Note that this will consider the feed to match if the feed's "link" URL contains any element's text. 
 
