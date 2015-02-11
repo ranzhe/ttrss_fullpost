@@ -42,15 +42,15 @@ class Af_Fullpost extends Plugin implements IHandler
 		$owner_uid = $article['owner_uid'];
 
 		// get url's for exclusion
-		$data = explode(",", $json_conf);
+		$data = explode(',', str_replace(",,", ",", str_replace("\n", ",", $json_conf)));
+		//$data = explode(",", $json_conf);
 		
 		try {
 			// if there is some stuff in the array
 			if (is_array($data)) {
 				// check url for excluded
 				foreach ($data as $urlpart) {
-					$urlpart = trim(str_replace("\n", "", $urlpart));
-					if (stripos($article['link'], $urlpart) !== false) {
+					if (stripos($article['link'], trim($urlpart)) !== false) {
 						$check_content = "Skipped";
 						break;
 					}
@@ -58,39 +58,37 @@ class Af_Fullpost extends Plugin implements IHandler
 			}
 			
 			// if the array is empty or url in list
-			if ($check_contente != "Skipped") {
+			if ($check_content != "Skipped") {
 				$check_content = $this->get_full_post($article['link']);
 			}
 			
-			// Print some information if content was processed by readability if enabled
-			if ($showInfoEnabled) {
-				if ($check_content != "Failed" && $check_content != "Skipped" && $check_content != "") {
-					$article['content'] = $check_content . "<br>Processed by Readability";
-				}
-				elseif ($check_content == "Skipped") {
-					$article['content'] = $article['content'] . "<br>Skipped Readability";
-				}
-				else {
-					$article['content'] = $article['content'] . "<br>Failed Processed by Readability";
-				}
+			// If enabled print some information if content was processed by readability
+			if ($check_content != "Failed" && $check_content != "Skipped" && trim($check_content) != "") {
+				$article['content'] = $check_content;
+				if ($showInfoEnabled === True) $article['content'] .= "<br>Processed by Readability";
 			}
-			
-			// mark article as processed
-			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
-			
+			elseif ($check_content == "Skipped") {
+				$article['content'] = $article['content'];
+				if ($showInfoEnabled === True) $article['content'] .= "<br>You skipped Readability";
+			}
+			else {
+				$article['content'] = $article['content'];
+				if ($showInfoEnabled === True) $article['content'] .= "<br>Failed processing by Readability";
+			}
 		} catch (Exception $e) {
 			// Readability failed to parse the page (?); don't process this article and keep going
-			// mark article as processed
-			$article['content'] = $article['content'] . "<br>ERROR Processing by Readability<br>" . $e;
-			$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
+			$article['content'] = $article['content'] . "<br>ERROR processing by Readability<br>" . $e;
 		}
 
 		// clean links without http, some sites do <img src="//www.site.com"> for safe to get images with http and https
 		$toClean = array("\"//");
 		$article["content"] = str_replace($toClean, "\"http://", $article["content"], $count);
-		if ($showInfoEnabled) {
-			$article['content'] = $article['content'] . " + " . $count . " Replacements";
+		if ($showInfoEnabled === True) {
+			$article['content'] .= " + " . $count . " Replacements";
 		}
+		
+		// mark article as processed
+		$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
 		
 		return $article;
 	}
@@ -171,7 +169,7 @@ class Af_Fullpost extends Plugin implements IHandler
 			$fullPostChecked = "";
 		}
 		
-		print "<p>Comma-separated list of web addresses, for which you don't would fetch the full post.<br>Example: site1.com, site2.org, site3.de</p>";
+		print "<p>Comma-separated list or one address per lin of webaddresses, for which you don't would fetch the full post.<br>Example: site1.com, site2.org, site3.de</p>";
 		print "<form dojoType=\"dijit.form.Form\">";
 		
 		print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt\">
