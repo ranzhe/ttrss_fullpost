@@ -109,6 +109,7 @@ class Af_Fullpost extends Plugin implements IHandler
                     CURLOPT_COOKIESESSION => true,
                     CURLOPT_COOKIEFILE => $cookie_file,
                     CURLOPT_COOKIEJAR => $cookie_file,
+                    CURLOPT_ENCODING => "gzip",
 					CURLOPT_URL => $request_url
 				));
 
