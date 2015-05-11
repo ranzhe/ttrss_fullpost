@@ -14,7 +14,7 @@ class Af_Fullpost extends Plugin implements IHandler
 			"Full post for ALL articles (requires CURL).",
 			"ManuelW");
 	}
-	
+
 	function api_version() {
 		return 2;
 	}
@@ -25,7 +25,7 @@ class Af_Fullpost extends Plugin implements IHandler
 		$host->add_hook($host::HOOK_PREFS_TABS, $this);
 		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
 	}
-	
+
 	function hook_article_filter($article) {
 		if (!function_exists("curl_init"))
 			return $article;
@@ -38,13 +38,13 @@ class Af_Fullpost extends Plugin implements IHandler
 
 		$json_conf = $this->host->get($this, 'json_conf');
 		$showInfoEnabled = sql_bool_to_bool($this->host->get($this, "af_fullpost_showinfo", bool_to_sql_bool(TRUE)));
-		
+
 		$owner_uid = $article['owner_uid'];
 
 		// get url's for exclusion
 		$data = explode(',', str_replace(",,", ",", str_replace("\n", ",", $json_conf)));
 		//$data = explode(",", $json_conf);
-		
+
 		try {
 			// if there is some stuff in the array
 			if (is_array($data)) {
@@ -56,12 +56,12 @@ class Af_Fullpost extends Plugin implements IHandler
 					}
 				}
 			}
-			
+
 			// if the array is empty or url in list
 			if ($check_content != "Skipped") {
 				$check_content = $this->get_full_post($article['link']);
 			}
-			
+
 			// If enabled print some information if content was processed by readability
 			if ($check_content != "Failed" && $check_content != "Skipped" && trim($check_content) != "") {
 				$article['content'] = $check_content;
@@ -86,16 +86,18 @@ class Af_Fullpost extends Plugin implements IHandler
 		if ($showInfoEnabled === True) {
 			$article['content'] .= " + " . $count . " Replacements";
 		}
-		
+
 		// mark article as processed
 		$article['plugin_data'] = "fullpost,$owner_uid:" . $article['plugin_data'];
-		
+
 		return $article;
 	}
-	
+
 	private function get_full_post($request_url) {
 		try {
 			try {
+				$cookie_file = tempnam(sys_get_temp_dir(), 'tt_cookie_');
+
 				$handle = curl_init();
 				curl_setopt_array($handle, array(
 					CURLOPT_USERAGENT => "Tiny Tiny RSS",
@@ -104,11 +106,15 @@ class Af_Fullpost extends Plugin implements IHandler
 					CURLOPT_HTTPGET => true,
 					CURLOPT_RETURNTRANSFER => true,
 					CURLOPT_TIMEOUT => 30,
+                    CURLOPT_COOKIESESSION => true,
+                    CURLOPT_COOKIEFILE => $cookie_file,
+                    CURLOPT_COOKIEJAR => $cookie_file,
 					CURLOPT_URL => $request_url
 				));
-	
+
 				$source = curl_exec($handle);
 				curl_close($handle);
+				unlink($cookie_file);
 			}
 			catch (Exception $e) {
 				$source = file_get_contents($request_url);
@@ -140,38 +146,38 @@ class Af_Fullpost extends Plugin implements IHandler
 				$content = $tidy->value;
 			}
 
-			$Data['content'] = $content;	
+			$Data['content'] = $content;
 		}
 		catch (Exception $e) {
 			// do nothing if it dont grep fulltext succesfully
 		}
-		
+
 		return $Data['content'];
 	}
-	
-	
+
+
 	function hook_prefs_tabs($args)
 	{
 		print '<div id="fullpostConfigTab" dojoType="dijit.layout.ContentPane"
 					href="backend.php?op=af_fullpost"
 					title="' . __('Exclude FullPost') . '"></div>';
 	}
-	
+
 	function index()
 	{
 		$pluginhost = PluginHost::getInstance();
 		$json_conf = $pluginhost->get($this, 'json_conf');
-		
+
 		$showInfoEnabled = $pluginhost->get($this, 'af_fullpost_showinfo');
 		if ($showInfoEnabled) {
 			$fullPostChecked = "checked=\"1\"";
 		} else {
 			$fullPostChecked = "";
 		}
-		
+
 		print "<p>Comma-separated list or one address per lin of webaddresses, for which you don't would fetch the full post.<br>Example: site1.com, site2.org, site3.de</p>";
 		print "<form dojoType=\"dijit.form.Form\">";
-		
+
 		print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt\">
 			evt.preventDefault();
 			if (this.validate()) {
@@ -185,22 +191,22 @@ class Af_Fullpost extends Plugin implements IHandler
 				//this.reset();
 			}
 			</script>";
-		
+
 		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pluginhandler\">";
 		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"save\">";
 		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"plugin\" value=\"af_fullpost\">";
-		
+
 		print "<table width='100%'><tr><td>";
-		
+
 		print "Show processed by Readability info on article bottom: <input dojoType=\"dijit.form.CheckBox\" type=\"checkbox\" name=\"af_fullpost_showinfo\" id=\"af_fullpost_showinfo\" $fullPostChecked>";
 		print "</tr></td>";
 		print "<tr><td>";
-		
+
 		print "<textarea dojoType=\"dijit.form.SimpleTextarea\" name=\"json_conf\" style=\"font-size: 12px; width: 99%; height: 500px;\">$json_conf</textarea>";
 		print "</td></tr></table>";
-		
+
 		print "<p><button dojoType=\"dijit.form.Button\" type=\"submit\">".__("Save")."</button>";
-		
+
 		print "</form>";
 	}
 
@@ -225,7 +231,7 @@ class Af_Fullpost extends Plugin implements IHandler
 		}
 		return false;
 	}
-	
+
 	function after()
 	{
 		return true;
